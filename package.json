@@ -13,8 +13,6 @@
     "url": "http://github.com/seanperkins/design-versioning/issues"
   },
   "license": "MIT",
-  "scripts": {
-  },
   "files": [
     "index.js"
   ],

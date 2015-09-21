@@ -1,23 +1,70 @@
-var util     = require('util');
-var chokidar = require('chokidar');
-var _        = require('lodash');
-var colors   = require('colors');
-var fse      = require('fs-extra');
-var revision = require('./revision.json');
+var util    = require('util');
+var chokidar= require('chokidar');
+var _       = require('lodash');
+var colors  = require('colors');
+var fse     = require('fs-extra');
+var walk    = require('walkdir');
+var p       = require('path');
+var revision= require('./revision.json');
 
-// One-liner for current directory, ignores .dotfiles
 var destinationDirectory = revision.destinationDir;
 var watchDirectory = revision.watchDir;
+
+//This gets set to the latest version based on versions in file names
+var versionArray = [0,0,0];
+
+//Walk destination directory to get latest version number
+walk(destinationDirectory, function(path, stat) {
+  setCurrentVersionArray(p.basename(path));
+});
+
+setCurrentVersionArray = function(pathBasename) {
+  var version = getVersionFromString(pathBasename);
+  if (isGreaterVersion(versionArray, version)){
+    versionArray = version;
+  }
+}
+
+getVersionFromString = function(string) {
+  var vArray = [0,0,0];
+  var versionRegEx = /^(\d)\.(\d)\.(\d)/;
+  var match = string.match(versionRegEx);
+  if (match) {
+    vArray = [match[1], match[2], match[3]];
+    vArray = vArray.map(function(vString) {
+      return parseInt(vString, 10);
+    });
+  }
+  return vArray;
+}
+
+isGreaterVersion = function(original, comparison) {
+  var isGreater = false;
+  if (typeof original === 'object' && typeof comparison === 'object') {
+    for (var i = 0; i <= original.length; i++) {
+      if (original[i] < comparison[i]) {
+        isGreater = true;
+        break;
+      }
+    };
+  }
+  return isGreater;
+}
+
+//Lets watch those files for new files, removed files, or changed files.
 var watcher = chokidar.watch(watchDirectory, {ignored: /[\/\\]\./});
 
 watcher.on('ready', function(){
   watcher.on('change', function fileChanged(path, event) {
     stageFile(path);
-  })
+  });
   watcher.on('add', function fileAdded(path, event) {
     stageFile(path);  
-  })
+  });
   watcher.on('remove', function fileRemoved(path, event) {
+    removeFile(path); 
+  });
+  watcher.on('unlink', function fileUnlinked(path, event) {
     removeFile(path); 
   });
 });
@@ -48,7 +95,8 @@ commitPrompt = function(newFiles) {
   if (newFiles === files) {
     console.log('Staged Files',files);
   }
-  process.stdout.write('<Increment>'.red + ' <Commit Message>'.green);
+  var version = versionArrayToString(versionArray)
+  process.stdout.write('<'.red + version.red + '>'.red + ' <Commit Message>'.green);
 }
 
 //Listen to command line prompt for message
@@ -84,7 +132,6 @@ parseMessage = function(text) {
 }
 
 var fileRegEx = new RegExp('('+watchDirectory+')(.*)');
-var versionArray = [0,0,0];
 
 createVersion = function(parsedObject) {
   var message = parsedObject.message;
@@ -94,14 +141,17 @@ createVersion = function(parsedObject) {
   _.each(files, function(file){
     var match = file.match(fileRegEx);
     var fileName = match[2];
+    var fileExt = p.extname(file);
 
     fse.mkdir(destinationDirectory + fileName, function(err){
       if(err){
-        console.log(err)
+        if (err.code !== 'EEXIST') {
+          console.log(err);
+        }
       }
     });
     
-    fse.copy(file, destinationDirectory+fileName+'/' + newVersion + ' ' + message, function(err){
+    fse.copy(file, destinationDirectory+fileName+'/' + newVersion + ' ' + message + fileExt, function(err){
       if(err){
         console.log(err)
       }

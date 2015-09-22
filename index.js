@@ -65,7 +65,7 @@ watcher.on('ready', function(){
     removeFile(path); 
   });
   watcher.on('unlink', function fileUnlinked(path, event) {
-    removeFile(path); 
+    removeFile(path);
   });
 });
 
@@ -81,22 +81,19 @@ stageFile = function(path) {
 
 removeFile = function(path) {
   if (_.includes(files, path)) {
-    var newFiles = files;
-    newFiles = _.filter(files, function(file){
+    files = _.filter(files, function(file){
       return file !== path;
     })
-    commitPrompt(newFiles);
+    commitPrompt(files);
   }
 }
 
-commitPrompt = function(newFiles) {
+commitPrompt = function(files) {
   process.stdout.clearLine();
   process.stdout.cursorTo(0);
-  if (newFiles === files) {
-    console.log('Staged Files',files);
-  }
+  console.log('Currently Staged ',files);
   var version = versionArrayToString(versionArray)
-  process.stdout.write('<'.red + version.red + '>'.red + ' <Commit Message>'.green);
+  process.stdout.write('<'.white + version.white + '>'.white + '<Add Commit Message>'.green);
 }
 
 //Listen to command line prompt for message

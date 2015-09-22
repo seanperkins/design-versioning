@@ -5,13 +5,42 @@ var colors  = require('colors');
 var fse     = require('fs-extra');
 var walk    = require('walkdir');
 var p       = require('path');
-var revision= require('./revision.json');
+var revision= {};
 
-var destinationDirectory = revision.destinationDir;
-var watchDirectory = revision.watchDir;
+//Require version config file if it is present
+try {
+  var stats = fs.lstatSync(process.cwd()+'/revision.json');
+  if (stats.isFile()) {
+    revision= require( process.cwd() + '/revision.json');
+  }
+}
+catch (e) {
+}
+
+directoryErrors = function(err){
+  if(err){
+    if (err.code !== 'EEXIST') {
+      console.log(err);
+    }
+  }
+}
+
+//Create a version directory inside of watch directory.
+createVersionDirectory = function() {
+  var versionDirectory = process.cwd()+'/.versions/';
+  fse.mkdir(versionDirectory, directoryErrors);
+  return versionDirectory;
+}
+
+var watchDirectory = revision.watchDir || process.cwd();
+var destinationDirectory = revision.destinationDir || createVersionDirectory();
+
+console.log('Watching: ' + watchDirectory);
+console.log('Save a file to get the version prompt.')
 
 //This gets set to the latest version based on versions in file names
 var versionArray = [0,0,0];
+
 
 //Walk destination directory to get latest version number
 walk(destinationDirectory, function(path, stat) {
@@ -140,13 +169,7 @@ createVersion = function(parsedObject) {
     var fileName = match[2];
     var fileExt = p.extname(file);
 
-    fse.mkdir(destinationDirectory + fileName, function(err){
-      if(err){
-        if (err.code !== 'EEXIST') {
-          console.log(err);
-        }
-      }
-    });
+    fse.mkdir(destinationDirectory + fileName, directoryErrors);
     
     fse.copy(file, destinationDirectory+fileName+'/' + newVersion + ' ' + message + fileExt, function(err){
       if(err){
